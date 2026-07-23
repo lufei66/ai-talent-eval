@@ -1,0 +1,58 @@
+name: Build and Deploy to AKS
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  ACR_REGISTRY: hkacr.azurecr.io
+  IMAGE_NAME: ai-talent-eval
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to ACR
+        run: |
+          az acr login --name hkacr
+
+      - name: Build and push
+        run: |
+          docker build -t ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+          docker tag ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_CLUSTER_NAME }}
+
+      - name: Deploy to AKS
+        run: |
+          kubectl create secret generic ai-talent-eval-secrets \
+            --from-literal=DATABASE_URL='${{ secrets.DATABASE_URL }}' \
+            --from-literal=AUTH_KEYS='${{ secrets.AUTH_KEYS }}' \
+            --from-literal=GEMINI_API_KEY='${{ secrets.GEMINI_API_KEY }}' \
+            --namespace=default \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/ingress.yaml
+          kubectl set image deployment/ai-talent-eval \
+            ai-talent-eval=${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --namespace=default
+          kubectl rollout status deployment/ai-talent-eval --namespace=default --timeout=120s

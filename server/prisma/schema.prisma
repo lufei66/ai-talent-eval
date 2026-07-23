@@ -1,0 +1,39 @@
+// ============================================================
+// AI Talent Evaluation — Prisma Schema
+// PostgreSQL 数据库
+// ============================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x", "darwin-arm64"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model EvaluationTask {
+  id                   String   @id @default(uuid())
+  taskId               String   @unique @map("task_id")
+  candidateName        String   @map("candidate_name")
+  candidateId          String?  @map("candidate_id")
+  remark               String?
+  callbackUrl          String?  @map("callback_url")
+  status               String   @default("PROCESSING")
+  progress             Int      @default(0)
+  progressDescription  String?  @map("progress_description")
+  fileCount            Int      @default(0) @map("file_count")
+  fileUrls             Json     @default("[]") @map("file_urls")
+  resultJson           Json?    @map("result_json")
+  failureReason        String?  @map("failure_reason")
+  retryable            Boolean  @default(false)
+  evaluationDurationMs Int?     @map("evaluation_duration_ms")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  completedAt          DateTime? @map("completed_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("evaluation_tasks")
+}

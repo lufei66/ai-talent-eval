@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>AI 人才评估 — API 接口文档 v1.1.0</title>
+<style>
+  @media print {
+    body { margin: 0; }
+    @page { size: A4; margin: 18mm 18mm 22mm 18mm; }
+    pre, blockquote, table { page-break-inside: avoid; }
+    h2, h3 { page-break-after: avoid; }
+  }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 13px; color: #333; line-height: 1.8; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+  h1 { font-size: 24px; color: #1C375E; border-bottom: 3px solid #C82828; padding-bottom: 10px; }
+  h2 { font-size: 17px; color: #1C375E; border-bottom: 1px solid #ddd; padding-bottom: 6px; margin-top: 28px; }
+  h3 { font-size: 14px; color: #0F3460; margin-top: 18px; }
+  h4 { font-size: 13px; color: #533483; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12px; }
+  th { background: #1C375E; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+  td { border: 1px solid #ddd; padding: 6px 10px; }
+  tr:nth-child(even) td { background: #f8f9fa; }
+  code { background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-size: 12px; }
+  pre { background: #23272E; color: #ABE372; padding: 14px 16px; border-radius: 6px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+  pre code { background: none; padding: 0; color: inherit; }
+  blockquote { border-left: 4px solid #E94560; margin: 12px 0; padding: 8px 16px; background: #FDF2F4; color: #666; }
+  .meta { color: #999; font-size: 12px; margin-bottom: 30px; }
+  .note { background: #FFF3CD; border: 1px solid #FFEEBA; border-radius: 4px; padding: 10px 14px; font-size: 12px; color: #856404; margin: 14px 0; }
+</style>
+</head>
+<body>
+
+<h1>AI 人才评估 — API 接口文档（简化版）</h1>
+<p class="meta">版本号：v1.1.0 &nbsp;|&nbsp; 更新日期：2026-07-21</p>
+
+<h2>1. 文档概述</h2>
+<p>本文档描述 AI 人才评估项目的核心 RESTful API，用于上传新人主播的面试视频及照片，并查询 Google Gemini 大模型对 10 大类 20 小项能力的综合评估结果。</p>
+
+<h2>2. 认证方式</h2>
+<p>所有接口均需在 HTTP Header 中携带 <code>Authorization</code>：</p>
+<pre><code>Authorization: Bearer &lt;authKey&gt;</code></pre>
+<p><code>authKey</code> 由系统管理员统一分配，未携带或无效将返回 <code>401</code>。</p>
+
+<h2>3. 通用响应格式</h2>
+<pre><code>{
+  "code": 0,
+  "message": "success",
+  "data": {},
+  "timestamp": 1752979200000
+}</code></pre>
+<table>
+<tr><th>字段</th><th>类型</th><th>说明</th></tr>
+<tr><td>code</td><td>integer</td><td>0 成功，非 0 异常</td></tr>
+<tr><td>message</td><td>string</td><td>状态描述</td></tr>
+<tr><td>data</td><td>object / null</td><td>业务数据，失败时为 null</td></tr>
+<tr><td>timestamp</td><td>integer (int64)</td><td>服务端响应时刻的 Unix 毫秒时间戳</td></tr>
+</table>
+
+<h2>4. 接口一：POST 上传视频/图片</h2>
+<ul>
+<li><strong>URL</strong>：<code>/evaluation/upload</code></li>
+<li><strong>Method</strong>：<code>POST</code></li>
+<li><strong>Content-Type</strong>：<code>multipart/form-data</code></li>
+</ul>
+
+<h3>请求参数</h3>
+<table>
+<tr><th>参数名</th><th>类型</th><th>必填</th><th>说明</th></tr>
+<tr><td>files</td><td>File[]</td><td>是</td><td>视频和图片文件。视频(.mp4/.mov/.avi)，图片(.jpg/.jpeg/.png/.webp)。至少 1 个，最多 10 个</td></tr>
+<tr><td>candidateName</td><td>string</td><td>是</td><td>候选人姓名，1–50 个字符</td></tr>
+<tr><td>candidateId</td><td>string</td><td>否</td><td>候选人编号</td></tr>
+<tr><td>remark</td><td>string</td><td>否</td><td>备注信息，最多 500 个字符</td></tr>
+<tr><td>callbackUrl</td><td>string</td><td>否</td><td>评估完成后的回调地址</td></tr>
+</table>
+
+<div class="note"><strong>文件限制</strong>：视频单文件 ≤ 500MB，图片单文件 ≤ 20MB</div>
+
+<h3>curl 示例</h3>
+<pre><code>curl -X POST "https://api.example.com/v1/evaluation/upload" \
+  -H "Authorization: Bearer sk-xxxxxx" \
+  -F "files=@interview.mp4" \
+  -F "files=@photo1.jpg" \
+  -F "candidateName=张三"</code></pre>
+
+<h3>成功响应</h3>
+<pre><code>{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "taskId": "eval_7a3f2b1c8d4e5f6a",
+    "status": "PROCESSING",
+    "createdAt": "2026-07-20T10:30:00+08:00"
+  },
+  "timestamp": 1752979200000
+}</code></pre>
+
+<h3>常见错误</h3>
+<table>
+<tr><th>场景</th><th>code</th><th>说明</th></tr>
+<tr><td>无认证</td><td>1001</td><td>未授权：缺少认证信息</td></tr>
+<tr><td>无效 authKey</td><td>1002</td><td>未授权：authKey 无效或已过期</td></tr>
+<tr><td>未上传文件</td><td>2004</td><td>未上传任何文件</td></tr>
+<tr><td>文件类型不支持</td><td>2002</td><td>支持：视频(.mp4/.mov/.avi)，图片(.jpg/.jpeg/.png/.webp)</td></tr>
+<tr><td>文件超大小</td><td>2003</td><td>视频最大 500MB，图片最大 20MB</td></tr>
+</table>
+
+<h2>5. 接口二：GET 查询评估结果</h2>
+<ul>
+<li><strong>URL</strong>：<code>/evaluation/result</code></li>
+<li><strong>Method</strong>：<code>GET</code></li>
+</ul>
+
+<h3>请求参数（Query String）</h3>
+<table>
+<tr><th>参数名</th><th>类型</th><th>必填</th><th>说明</th></tr>
+<tr><td>taskId</td><td>string</td><td>是</td><td>评估任务唯一标识（由上传接口返回）</td></tr>
+</table>
+
+<h3>curl 示例</h3>
+<pre><code>curl "https://api.example.com/v1/evaluation/result?taskId=eval_7a3f2b1c8d4e5f6a" \
+  -H "Authorization: Bearer sk-xxxxxx"</code></pre>
+
+<h3>状态一：处理中（PROCESSING）</h3>
+<pre><code>{
+  "code": 0,
+  "data": {
+    "taskId": "eval_7a3f2b1c8d4e5f6a",
+    "status": "PROCESSING",
+    "progress": 45,
+    "progressDescription": "正在分析产品学习表达能力...",
+    "candidateName": "张三",
+    "createdAt": "2026-07-20T10:30:00+08:00",
+    "result": null
+  }
+}</code></pre>
+
+<h3>状态二：已完成（COMPLETED）</h3>
+<pre><code>{
+  "code": 0,
+  "data": {
+    "taskId": "eval_7a3f2b1c8d4e5f6a",
+    "status": "COMPLETED",
+    "progress": 100,
+    "candidateName": "张三",
+    "candidateId": "EMP20260001",
+    "createdAt": "2026-07-20T10:30:00+08:00",
+    "completedAt": "2026-07-20T10:35:42+08:00",
+    "evaluationDurationMs": 342000,
+    "result": {
+      "totalScore": 81.0,
+      "grade": "A",
+      "gradeLabel": "良好",
+      "dimensions": [
+        {
+          "dimensionId": 1, "name": "外貌", "weight": 0.18, "weightedScore": 16.2, "maxScore": 18.0,
+          "subItems": [
+            { "name": "轮廓五官/立体辨识度", "score": 6, "maxScore": 7, "comment": "脸型流畅舒展，五官立体度出色，上镜轮廓清晰。" },
+            { "name": "整体观感", "score": 6, "maxScore": 7, "comment": "整体干净舒服有辨识度，氛围温和自然。" },
+            { "name": "静态情绪底色", "score": 4, "maxScore": 4, "comment": "目光柔和有温度，呈现放松平和的情绪暗示。" }
+          ]
+        },
+        {
+          "dimensionId": 2, "name": "气质体态", "weight": 0.12, "weightedScore": 10.2, "maxScore": 12.0,
+          "subItems": [
+            { "name": "气质", "score": 5, "maxScore": 6, "comment": "有明显精致感与高级感，气质出众。" },
+            { "name": "体态", "score": 5, "maxScore": 6, "comment": "体态自然端正，整体看着精神。" }
+          ]
+        },
+        {
+          "dimensionId": 3, "name": "妆容", "weight": 0.05, "weightedScore": 4.0, "maxScore": 5.0,
+          "subItems": [
+            { "name": "妆容/发型", "score": 4, "maxScore": 5, "comment": "完整日常妆容，底妆均匀，发型整齐。" }
+          ]
+        },
+        {
+          "dimensionId": 4, "name": "镜前松弛感", "weight": 0.05, "weightedScore": 4.0, "maxScore": 5.0,
+          "subItems": [
+            { "name": "神情自然放松", "score": 4, "maxScore": 5, "comment": "整体自然放松，观众看着舒服。" }
+          ]
+        },
+        {
+          "dimensionId": 5, "name": "自信心笃定", "weight": 0.07, "weightedScore": 5.88, "maxScore": 7.0,
+          "subItems": [
+            { "name": "语气/气场", "score": 6, "maxScore": 7, "comment": "信心十足，讲解流畅有底气，有主角感。" }
+          ]
+        },
+        {
+          "dimensionId": 6, "name": "情绪张力控制力", "weight": 0.07, "weightedScore": 5.25, "maxScore": 7.0,
+          "subItems": [
+            { "name": "情绪张力/控制力", "score": 5, "maxScore": 7, "comment": "感染力和控制力不错，能带动粉丝。" }
+          ]
+        },
+        {
+          "dimensionId": 7, "name": "专注力", "weight": 0.05, "weightedScore": 4.0, "maxScore": 5.0,
+          "subItems": [
+            { "name": "注意力集中/状态维持", "score": 4, "maxScore": 5, "comment": "注意力在线，反应及时，精神面貌良好。" }
+          ]
+        },
+        {
+          "dimensionId": 8, "name": "口音", "weight": 0.11, "weightedScore": 8.8, "maxScore": 11.0,
+          "subItems": [
+            { "name": "口条", "score": 5, "maxScore": 5, "comment": "口齿清晰，表达流畅，达到普通话二级甲等。" },
+            { "name": "声线", "score": 4, "maxScore": 6, "comment": "声音条件不错，耐久度可接受。" }
+          ]
+        },
+        {
+          "dimensionId": 9, "name": "产品学习表达能力", "weight": 0.12, "weightedScore": 9.0, "maxScore": 12.0,
+          "subItems": [
+            { "name": "产品学习能力", "score": 4, "maxScore": 5, "comment": "核心信息完整覆盖，重点抓得准。" },
+            { "name": "产品表达能力", "score": 5, "maxScore": 7, "comment": "通俗和专业之间找到平衡，讲解易懂。" }
+          ]
+        },
+        {
+          "dimensionId": 10, "name": "话术天赋", "weight": 0.18, "weightedScore": 14.4, "maxScore": 18.0,
+          "subItems": [
+            { "name": "开播留人话术", "score": 2, "maxScore": 3, "comment": "开场能抓人，话术有冲击力。" },
+            { "name": "内容叙述话术", "score": 3, "maxScore": 3, "comment": "场景化叙述有共鸣，自然不生硬。" },
+            { "name": "互动控场话术", "score": 2, "maxScore": 3, "comment": "能自然回应弹幕，互动感较好。" },
+            { "name": "信任背书话术", "score": 3, "maxScore": 3, "comment": "亲身体验+选品标准，专业背书能力强。" },
+            { "name": "商业转化话术", "score": 2, "maxScore": 3, "comment": "价格锚定+限时限量，算账式说服有效。" },
+            { "name": "下拨沉淀话术", "score": 2, "maxScore": 3, "comment": "有引导关注意识，话术需再打磨。" }
+          ]
+        }
+      ],
+      "generalTags": [
+        { "name": "体力体能", "value": "预计可持续上播 3 小时" },
+        { "name": "语言能力", "value": "普通话二级甲等" },
+        { "name": "技能特长", "value": "美妆" }
+      ],
+      "industryAdvantages": [
+        { "name": "美妆个护", "matchLevel": "HIGH", "comment": "妆容精致，气质与美妆类目高度匹配" },
+        { "name": "生活百货", "matchLevel": "MEDIUM", "comment": "亲和力足，适合生活好物分享" }
+      ],
+      "overallComment": "该候选人综合素质良好，外貌和气质条件出众，镜前表现自然放松，具备较好的产品学习和表达能力。口音方面声线略显单薄，可通过发声训练进一步提升。话术天赋各子项均展现出可培养的潜力。综合评级 A 级，建议进入下一轮面试或安排试播考核。"
+    }
+  }
+}</code></pre>
+
+<h3>状态三：失败（FAILED）</h3>
+<pre><code>{
+  "code": 0,
+  "data": {
+    "taskId": "eval_7a3f2b1c8d4e5f6a",
+    "status": "FAILED",
+    "failureReason": "视频文件损坏或格式无法解析",
+    "retryable": true,
+    "result": null
+  }
+}</code></pre>
+
+<h2>6. 评估结果字段说明</h2>
+
+<h3>顶层字段</h3>
+<table>
+<tr><th>字段</th><th>类型</th><th>说明</th></tr>
+<tr><td>totalScore</td><td>float</td><td>总分（满分100）。全部20小项得分直接加总即为百分制</td></tr>
+<tr><td>grade</td><td>string</td><td>等级代码：S / A+ / A / B / C / C-</td></tr>
+<tr><td>gradeLabel</td><td>string</td><td>等级中文名：顶级人才 / 优秀 / 良好 / 一般 / 较弱 / 不达标</td></tr>
+<tr><td>dimensions</td><td>Dimension[]</td><td>10个维度评估详情</td></tr>
+<tr><td>generalTags</td><td>Tag[]</td><td>通用标签（体力体能、语言能力、技能特长等）</td></tr>
+<tr><td>industryAdvantages</td><td>Advantage[]</td><td>行业优势匹配（美妆个护、服饰鞋包等）</td></tr>
+<tr><td>overallComment</td><td>string</td><td>综合评价总结</td></tr>
+</table>
+
+<h3>维度（Dimension）字段</h3>
+<table>
+<tr><th>字段</th><th>类型</th><th>说明</th></tr>
+<tr><td>dimensionId</td><td>integer</td><td>维度编号 1–10</td></tr>
+<tr><td>name</td><td>string</td><td>维度中文名称</td></tr>
+<tr><td>weight</td><td>float</td><td>权重（0.00–1.00）</td></tr>
+<tr><td>weightedScore</td><td>float</td><td>该维度加权得分</td></tr>
+<tr><td>maxScore</td><td>float</td><td>该维度满分</td></tr>
+<tr><td>subItems</td><td>SubItem[]</td><td>子项评分列表</td></tr>
+</table>
+
+<h3>子项（SubItem）字段</h3>
+<table>
+<tr><th>字段</th><th>类型</th><th>说明</th></tr>
+<tr><td>name</td><td>string</td><td>子项名称</td></tr>
+<tr><td>score</td><td>integer</td><td>实际得分</td></tr>
+<tr><td>maxScore</td><td>integer</td><td>满分</td></tr>
+<tr><td>comment</td><td>string</td><td>评语</td></tr>
+</table>
+
+<h3>总分计算</h3>
+<p>全部 20 小项得分直接加总即为百分制总分（满分 100）。</p>
+<p>20 项满分分布：前 9 类 15 项共 82 分，第 10 类话术天赋 6 项每项 3 分共 18 分。</p>
+
+<h3>等级映射</h3>
+<table>
+<tr><th>总分区间</th><th>等级</th><th>含义</th></tr>
+<tr><td>95–100</td><td>S</td><td>顶级人才</td></tr>
+<tr><td>88–94</td><td>A+</td><td>优秀</td></tr>
+<tr><td>80–87</td><td>A</td><td>良好</td></tr>
+<tr><td>70–79</td><td>B</td><td>一般</td></tr>
+<tr><td>60–69</td><td>C</td><td>较弱</td></tr>
+<tr><td>&lt; 60</td><td>C-</td><td>不达标</td></tr>
+</table>
+
+<h2>7. 错误码速查</h2>
+<table>
+<tr><th>HTTP</th><th>code</th><th>message</th></tr>
+<tr><td>401</td><td>1001</td><td>未授权：缺少认证信息</td></tr>
+<tr><td>401</td><td>1002</td><td>未授权：authKey 无效或已过期</td></tr>
+<tr><td>400</td><td>2001</td><td>请求参数校验失败</td></tr>
+<tr><td>400</td><td>2002</td><td>文件类型不支持</td></tr>
+<tr><td>400</td><td>2003</td><td>文件大小超出限制</td></tr>
+<tr><td>400</td><td>2004</td><td>未上传任何文件</td></tr>
+<tr><td>404</td><td>3001</td><td>评估任务不存在</td></tr>
+<tr><td>500</td><td>5001</td><td>文件存储失败</td></tr>
+<tr><td>500</td><td>5002</td><td>评估服务调用失败</td></tr>
+<tr><td>500</td><td>5003</td><td>评估结果保存失败</td></tr>
+</table>
+
+</body>
+</html>

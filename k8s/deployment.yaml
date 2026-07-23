@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-talent-eval
+  namespace: default
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: ai-talent-eval
+  template:
+    metadata:
+      labels:
+        app: ai-talent-eval
+    spec:
+      containers:
+        - name: ai-talent-eval
+          image: hkacr.azurecr.io/ai-talent-eval:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ai-talent-eval-secrets
+                  key: DATABASE_URL
+            - name: AUTH_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: ai-talent-eval-secrets
+                  key: AUTH_KEYS
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-talent-eval-secrets
+                  key: GEMINI_API_KEY
+            - name: GEMINI_MODEL
+              value: "gemini-2.5-flash"
+            - name: MOCK_MODE
+              value: "false"
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 5
+            timeoutSeconds: 5
+      volumes:
+        - name: uploads
+          emptyDir:
+            sizeLimit: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-talent-eval
+  namespace: default
+spec:
+  selector:
+    app: ai-talent-eval
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP

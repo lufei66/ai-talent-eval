@@ -1,0 +1,16 @@
+{
+  "name": "ai-talent-eval",
+  "private": true,
+  "workspaces": [
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "cd server && npm run dev",
+    "build": "npm run build -w shared && npm run build -w server",
+    "typecheck": "npm run build -w shared && npm run typecheck -w server"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
